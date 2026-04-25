@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { py } from '../../../lib/api.js'
 import { MOCK_LEADERBOARD } from '../../../lib/mock.js'
 import { getPoints, subscribe } from '../../../lib/points.js'
 
@@ -18,26 +17,18 @@ function avatarColor(username) {
 }
 
 export default function SnapLeaderboard({ onClose }) {
-  const [baseRows, setBaseRows] = useState(null)
   const [myPoints, setMyPoints] = useState(getPoints)
-
-  useEffect(() => {
-    py.leaderboard()
-      .then(d => setBaseRows(d?.leaderboard?.length ? d.leaderboard : MOCK_LEADERBOARD))
-      .catch(() => setBaseRows(MOCK_LEADERBOARD))
-  }, [])
 
   // Subscribe to real-time point updates from GuessThePrice
   useEffect(() => subscribe(setMyPoints), [])
 
   // Merge live "You" score and re-sort every time points change
   const rows = useMemo(() => {
-    if (!baseRows) return null
-    return baseRows
+    return MOCK_LEADERBOARD
       .map(r => r.isYou ? { ...r, score: myPoints } : r)
       .sort((a, b) => b.score - a.score)
       .map((r, i) => ({ ...r, rank: i + 1 }))
-  }, [baseRows, myPoints])
+  }, [myPoints])
 
   const top3 = (rows || []).slice(0, 3)
   const rest  = (rows || []).slice(3)
@@ -70,7 +61,7 @@ export default function SnapLeaderboard({ onClose }) {
         </div>
 
         {/* Podium */}
-        {rows && (
+        {(
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -110,7 +101,7 @@ export default function SnapLeaderboard({ onClose }) {
         )}
 
         {/* Full ranking */}
-        {rows && (
+        {(
           <>
             <div className="text-[11px] uppercase tracking-widest font-bold text-bunq-mute mb-2">All players</div>
             <div className="space-y-1.5">
