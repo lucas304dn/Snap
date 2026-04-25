@@ -2,7 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import Anthropic from '@anthropic-ai/sdk'
-import { handleBunqWebhook, handleSimulate } from './webhookHandler.js'
+import { handleBunqWebhook, handleSimulate } from './webhookhandler.js'
 import { supabase } from './supabase.js'
 
 dotenv.config()
