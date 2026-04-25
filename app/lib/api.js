@@ -1,6 +1,7 @@
 // All API calls go to the Python FastAPI backend (snap-backend).
 
-const PY = import.meta.env.VITE_PY_BACKEND || 'http://localhost:8000'
+const PY   = import.meta.env.VITE_PY_BACKEND  || 'http://localhost:8000'
+const NODE = import.meta.env.VITE_NODE_BACKEND || 'http://localhost:3001'
 
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(url, opts)
@@ -90,5 +91,36 @@ export const py = {
 
   leaderboard() {
     return jsonFetch(`${PY}/api/leaderboard`)
+  }
+}
+
+/** Node.js backend — Claude vision, identify, and AI hint endpoints. */
+export const node = {
+  simulate({ merchant, amount, currency = 'EUR', user_id }) {
+    return jsonFetch(`${NODE}/api/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant, amount, currency, user_id })
+    })
+  },
+
+  health() {
+    return jsonFetch(`${NODE}/health`)
+  },
+
+  identify(image_base64, media_type = 'image/jpeg') {
+    return jsonFetch(`${NODE}/api/identify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64, media_type })
+    })
+  },
+
+  guessHint({ photo_url, merchant }) {
+    return jsonFetch(`${NODE}/api/guess-hint`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo_url, merchant })
+    })
   }
 }

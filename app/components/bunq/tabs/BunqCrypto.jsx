@@ -12,7 +12,7 @@ export default function BunqCrypto() {
   const total = HOLDINGS.reduce((s, h) => s + h.value, 0)
 
   return (
-    <div className="app-content h-full pt-4 px-5 pb-4">
+    <div className="app-content h-full pt-[52px] px-5 pb-4">
       <div className="flex items-baseline justify-between">
         <h1 className="text-[24px] font-bold text-white tracking-tight">Stocks & crypto</h1>
         <span className="text-[10px] text-bunq-mute uppercase tracking-wider">via Kraken</span>

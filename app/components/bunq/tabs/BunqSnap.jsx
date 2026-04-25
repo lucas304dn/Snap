@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import SnapFeed from '../snap/SnapFeed.jsx'
 import SnapMap from '../snap/SnapMap.jsx'
 import WeeklyWrap from '../snap/WeeklyWrap.jsx'
+import SnapLeaderboard from '../snap/SnapLeaderboard.jsx'
 
 export default function BunqSnap() {
   // Single overlay state — guarantees map and wrap are never both mounted
@@ -32,6 +33,17 @@ export default function BunqSnap() {
             aria-label="Weekly Wrap"
           >
             <BunqFaceSmall />
+          </button>
+          {/* Leaderboard */}
+          <button
+            onClick={() => setOverlay(v => v === 'leaderboard' ? null : 'leaderboard')}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors text-[16px] ${
+              overlay === 'leaderboard' ? 'text-bunq-black' : 'bg-bunq-card text-white'
+            }`}
+            style={overlay === 'leaderboard' ? { background: '#FFD700' } : {}}
+            aria-label="Leaderboard"
+          >
+            🏆
           </button>
           {/* Map toggle */}
           <button
@@ -78,6 +90,19 @@ export default function BunqSnap() {
               className="absolute inset-0"
             >
               <WeeklyWrap onClose={() => setOverlay(null)} />
+            </motion.div>
+          )}
+
+          {overlay === 'leaderboard' && (
+            <motion.div
+              key="leaderboard"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0"
+            >
+              <SnapLeaderboard onClose={() => setOverlay(null)} />
             </motion.div>
           )}
         </AnimatePresence>

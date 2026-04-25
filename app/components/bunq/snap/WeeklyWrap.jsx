@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { py } from '../../../lib/api.js'
 import { DEMO_USER_ID } from '../../../lib/supabase.js'
 
-const RAINBOW = ['#FF3A2D','#FF7A00','#FFD700','#00C896','#4361EE','#8B5CF6']
+const RAINBOW = ['#FF3A2D', '#FF7A00', '#FFD700', '#00C896', '#4361EE', '#8B5CF6']
 
 function mapWrapData(raw) {
   const wrap = raw.wrap || ''
@@ -17,7 +17,7 @@ function mapWrapData(raw) {
       : '',
     amount: Number(tx.amount).toFixed(2),
     photo_url: tx.photo_url || null,
-    // Keep raw fields so we can open them in a post modal
+    // Keep raw fields so we can open them in a lightbox
     _raw: tx,
   }))
 
@@ -25,26 +25,11 @@ function mapWrapData(raw) {
   return {
     spending,
     transactions,
+    top_category: raw.top_category || null,
+    fun_fact: raw.fun_fact || null,
     mention: mention_tx?.caption || null,
     mention_photo: mention_tx?.photo_url || null,
     mention_merchant: mention_tx?.merchant || null,
-  }
-}
-
-function rawToPost(tx) {
-  return {
-    id: tx.snapped_at || tx.merchant,
-    user_id: DEMO_USER_ID,
-    merchant: tx.merchant,
-    amount: tx.amount,
-    currency: tx.currency || 'EUR',
-    photo_url: tx.photo_url,
-    caption: tx.caption,
-    location_name: tx.location_name,
-    country_code: tx.country_code,
-    snapped_at: tx.snapped_at,
-    show_amount: true,
-    profiles: { username: 'you', display_name: 'You' },
   }
 }
 
@@ -52,7 +37,7 @@ export default function WeeklyWrap({ onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [openPost, setOpenPost] = useState(null) // raw tx for post modal
+  const [lightbox, setLightbox] = useState(null)
 
   const fetchWrap = useCallback(() => {
     setLoading(true)
@@ -65,135 +50,117 @@ export default function WeeklyWrap({ onClose }) {
 
   useEffect(() => { fetchWrap() }, [fetchWrap])
 
+  const totalSpent = data?.transactions
+    ? data.transactions.reduce((s, t) => s + parseFloat(t.amount || 0), 0)
+    : 0
+
+  const cities = data?.transactions
+    ? [...new Set(data.transactions.map(t => t.location).filter(Boolean))].length
+    : 0
+
   return (
-    <div className="absolute inset-0 flex flex-col" style={{ background: 'linear-gradient(160deg, #0d0d1a 0%, #0A0A0F 60%, #0d1a14 100%)' }}>
+    <>
+      <div className="absolute inset-0 flex flex-col" style={{ background: 'linear-gradient(160deg, #0d0d1a 0%, #0A0A0F 60%, #0d1a14 100%)' }}>
 
-      {/* Rainbow stripe */}
-      <div className="flex h-[3px] flex-shrink-0">
-        {RAINBOW.map(c => <div key={c} className="flex-1" style={{ background: c }} />)}
-      </div>
-
-      {/* Header */}
-      <div className="px-5 pt-3 pb-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <BunqFace size={40} />
-          <div>
-            <div className="text-[17px] font-bold text-white tracking-tight">Weekly Wrap</div>
-            <div className="text-[10px] text-bunq-mute uppercase tracking-wider">Powered by Claude AI</div>
-          </div>
+        {/* Rainbow stripe */}
+        <div className="flex h-[3px] flex-shrink-0">
+          {RAINBOW.map(c => <div key={c} className="flex-1" style={{ background: c }} />)}
         </div>
-        <button onClick={onClose} className="w-8 h-8 rounded-full bg-bunq-card flex items-center justify-center text-white text-lg">
-          ×
-        </button>
-      </div>
 
-      {/* Date range pill */}
-      <div className="px-5 mb-3 flex-shrink-0">
-        <span className="px-3 py-1 rounded-full bg-bunq-card text-[11px] text-bunq-mute font-semibold border border-bunq-border">
-          {weekRange()}
-        </span>
-      </div>
+        {/* Header */}
+        <div className="px-5 pt-3 pb-2 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <BunqFace size={40} />
+            <div>
+              <div className="text-[18px] font-bold text-white tracking-tight">Weekly Wrap</div>
+              <div className="text-[10px] text-bunq-mute uppercase tracking-wider">Powered by Claude AI</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-bunq-card flex items-center justify-center text-white text-lg">
+            ×
+          </button>
+        </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 pb-28">
-        <AnimatePresence mode="wait">
+        {/* Date range */}
+        <div className="px-5 mb-3 flex-shrink-0">
+          <span className="px-3 py-1 rounded-full bg-bunq-card text-[11px] text-bunq-mute font-semibold border border-bunq-border">
+            {weekRange()}
+          </span>
+        </div>
 
-          {loading && (
-            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center pt-16 gap-4">
-              <div className="w-14 h-14 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: '#00C896', borderTopColor: 'transparent' }} />
-              <div className="text-[14px] font-semibold text-white">Analysing your week…</div>
-              <div className="text-[12px] text-bunq-mute">Claude is reading your transactions</div>
-            </motion.div>
-          )}
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 pb-28">
+          <AnimatePresence mode="wait">
 
-          {error && !loading && (
-            <motion.div key="error" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="pt-12 text-center space-y-3">
-              <div className="text-3xl">⚠️</div>
-              <div className="text-[14px] font-semibold text-white">Could not generate wrap</div>
-              <div className="text-[12px] text-bunq-mute leading-relaxed max-w-[240px] mx-auto">{error}</div>
-              <button onClick={fetchWrap} className="mt-4 px-5 py-2.5 rounded-xl font-bold text-sm text-bunq-black"
-                style={{ background: '#00C896' }}>
-                Try again
-              </button>
-            </motion.div>
-          )}
+            {loading && (
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center pt-16 gap-4">
+                <div className="w-14 h-14 rounded-full border-2 animate-spin"
+                  style={{ borderColor: '#00C896', borderTopColor: 'transparent' }} />
+                <div className="text-[14px] font-semibold text-white">Analysing your week…</div>
+                <div className="text-[12px] text-bunq-mute">Claude is reading your transactions</div>
+              </motion.div>
+            )}
 
-          {data && !loading && (
-            <motion.div key="content" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }} className="space-y-4">
+            {error && !loading && (
+              <motion.div key="error" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className="pt-12 text-center space-y-3">
+                <div className="text-3xl">⚠️</div>
+                <div className="text-[14px] font-semibold text-white">Could not generate wrap</div>
+                <div className="text-[12px] text-bunq-mute leading-relaxed max-w-[240px] mx-auto">{error}</div>
+                <button onClick={fetchWrap} className="mt-4 px-5 py-2.5 rounded-xl font-bold text-sm text-bunq-black"
+                  style={{ background: '#00C896' }}>
+                  Try again
+                </button>
+              </motion.div>
+            )}
 
-              {/* Spending paragraph */}
-              {data.spending && (
-                <div className="rounded-2xl bg-bunq-card border border-bunq-border p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#00C896' }} />
-                    <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#00C896' }}>
-                      This week
-                    </span>
-                  </div>
-                  <p className="text-[13px] text-white/90 leading-relaxed">{data.spending}</p>
+            {data && !loading && (
+              <motion.div key="content" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }} className="space-y-4">
+
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <StatCard label="Spent" value={`€${totalSpent.toFixed(0)}`} color="#00C896" />
+                  <StatCard label="Transactions" value={data.transactions?.length ?? 0} color="#4361EE" />
+                  <StatCard label="Cities" value={cities || '—'} color="#FF7A00" />
                 </div>
-              )}
 
-              {/* Transaction list */}
-              {data.transactions && data.transactions.length > 0 && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-widest font-bold text-bunq-mute mb-2">Transactions</div>
-                  <div className="space-y-2">
-                    {data.transactions.map((tx, i) => (
-                      <button
-                        key={i}
-                        onClick={() => tx._raw?.photo_url && setOpenPost(tx._raw)}
-                        className={`w-full flex items-center gap-3 rounded-xl bg-bunq-card border border-bunq-border px-3 py-2.5 text-left transition-opacity ${tx._raw?.photo_url ? 'active:opacity-70' : ''}`}
-                      >
-                        {tx.photo_url ? (
-                          <div className="relative flex-shrink-0">
-                            <img src={tx.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
-                            <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-black/20">
-                              <span className="text-[9px] text-white font-bold opacity-0 group-hover:opacity-100">👁</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
-                            style={{ background: RAINBOW[i % RAINBOW.length] + '22' }}>
-                            💳
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-semibold text-white truncate">{tx.merchant}</div>
-                          <div className="text-[11px] text-bunq-mute">{tx.location}{tx.date ? ` · ${tx.date}` : ''}</div>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <div className="text-[13px] font-bold" style={{ color: '#00C896' }}>€{tx.amount}</div>
-                          {tx.photo_url && <span className="text-bunq-mute text-[11px]">›</span>}
-                        </div>
-                      </button>
-                    ))}
+                {/* Top category badge */}
+                {data.top_category && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-bunq-card border border-bunq-border">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-bunq-mute">Top category</span>
+                    <span className="text-[13px] font-bold text-white ml-auto">{data.top_category}</span>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Memorable mention */}
-              {data.mention && (
-                <button
-                  onClick={() => {
-                    const raw = data.transactions?.find(t => t.photo_url === data.mention_photo)?._raw
-                    if (raw) setOpenPost(raw)
-                  }}
-                  className="w-full rounded-2xl overflow-hidden border-l-4 text-left active:opacity-70 transition-opacity"
-                  style={{ background: '#1a1030', borderColor: '#8B5CF6' }}
-                >
-                  {data.mention_photo && (
-                    <img
-                      src={data.mention_photo}
-                      alt={data.mention_merchant || 'mention'}
-                      className="w-full h-36 object-cover"
-                    />
-                  )}
-                  <div className="p-4">
+                {/* AI spending analysis */}
+                {data.spending && (
+                  <div className="rounded-2xl bg-bunq-card border border-bunq-border p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#00C896' }} />
+                      <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#00C896' }}>
+                        This week
+                      </span>
+                    </div>
+                    <p className="text-[13px] text-white/90 leading-relaxed">{data.spending}</p>
+                  </div>
+                )}
+
+                {/* Fun fact */}
+                {data.fun_fact && (
+                  <div className="rounded-2xl px-4 py-3 border border-yellow-400/20"
+                    style={{ background: '#FFD70010' }}>
+                    <div className="flex items-start gap-2">
+                      <span className="text-[16px]">💡</span>
+                      <p className="text-[12px] text-white/85 leading-relaxed italic">{data.fun_fact}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Memorable mention */}
+                {data.mention && (
+                  <div className="rounded-2xl border-l-4 p-4" style={{ background: '#1a1030', borderColor: '#8B5CF6' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[14px]">🏆</span>
                       <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#8B5CF6' }}>
@@ -205,90 +172,119 @@ export default function WeeklyWrap({ onClose }) {
                         </span>
                       )}
                     </div>
-                    <p className="text-[13px] text-white/90 leading-relaxed italic">{data.mention}</p>
+                    <p className="text-[13px] text-white/90 leading-relaxed italic mb-3">{data.mention}</p>
+                    {data.mention_photo && (
+                      <button
+                        onClick={() => setLightbox(data.mention_photo)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border"
+                        style={{ borderColor: '#8B5CF640', color: '#8B5CF6', background: '#8B5CF610' }}
+                      >
+                        <span>📸</span> View photo
+                      </button>
+                    )}
                   </div>
-                </button>
-              )}
+                )}
 
-            </motion.div>
-          )}
+                {/* Transaction list */}
+                {data.transactions && data.transactions.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-widest font-bold text-bunq-mute mb-2">All transactions</div>
+                    <div className="space-y-2">
+                      {data.transactions.map((tx, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          className="flex items-center gap-3 rounded-xl bg-bunq-card border border-bunq-border px-3 py-2.5"
+                        >
+                          {tx.photo_url ? (
+                            <button onClick={() => setLightbox(tx.photo_url)} className="flex-shrink-0">
+                              <img
+                                src={tx.photo_url}
+                                alt=""
+                                className="w-11 h-11 rounded-xl object-cover hover:opacity-80 transition-opacity"
+                              />
+                            </button>
+                          ) : (
+                            <div
+                              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                              style={{ background: RAINBOW[i % RAINBOW.length] + '22' }}
+                            >
+                              💳
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-semibold text-white truncate">{tx.merchant}</div>
+                            <div className="text-[11px] text-bunq-mute">
+                              {tx.location}{tx.date ? ` · ${tx.date}` : ''}
+                            </div>
+                          </div>
+                          <div className="text-[14px] font-bold flex-shrink-0" style={{ color: '#00C896' }}>
+                            €{tx.amount}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-        </AnimatePresence>
+              </motion.div>
+            )}
+
+          </AnimatePresence>
+        </div>
+
+        {/* Regenerate button */}
+        {!loading && (
+          <div className="absolute bottom-0 inset-x-0 px-5 pb-6 pt-3"
+            style={{ background: 'linear-gradient(to top, #0A0A0F 60%, transparent)' }}>
+            <button onClick={fetchWrap}
+              className="w-full py-3 rounded-2xl bg-bunq-card border border-bunq-border text-white font-semibold text-[13px] flex items-center justify-center gap-2">
+              <span style={{ color: '#00C896' }}>↺</span> Regenerate
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Regenerate button */}
-      {!loading && (
-        <div className="absolute bottom-0 inset-x-0 px-5 pb-6 pt-3"
-          style={{ background: 'linear-gradient(to top, #0A0A0F 60%, transparent)' }}>
-          <button onClick={fetchWrap}
-            className="w-full py-3 rounded-2xl bg-bunq-card border border-bunq-border text-white font-semibold text-[13px] flex items-center justify-center gap-2">
-            <span style={{ color: '#00C896' }}>↺</span> Regenerate
-          </button>
-        </div>
-      )}
-
-      {/* Post modal — tap a photo to open */}
+      {/* Photo lightbox */}
       <AnimatePresence>
-        {openPost && (
+        {lightbox && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col justify-end"
-            style={{ zIndex: 50 }}
-            onClick={() => setOpenPost(null)}
+            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-6"
+            onClick={() => setLightbox(null)}
           >
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className="bg-bunq-navy rounded-t-3xl overflow-hidden max-h-[90%] overflow-y-auto"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               onClick={e => e.stopPropagation()}
+              className="w-full max-w-sm"
             >
-              {/* Handle + close */}
-              <div className="flex items-center justify-between px-5 pt-3 pb-2">
-                <div className="w-10 h-1 bg-bunq-border rounded-full mx-auto" />
-              </div>
-              <div className="flex justify-end px-5 pb-2">
-                <button onClick={() => setOpenPost(null)} className="text-bunq-mute text-xl w-8 h-8 flex items-center justify-center">×</button>
-              </div>
-
-              {/* Photo */}
-              {openPost.photo_url && (
-                <img src={openPost.photo_url} alt="" className="w-full aspect-square object-cover" />
-              )}
-
-              {/* Details */}
-              <div className="px-5 py-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-[15px] font-bold text-white">{openPost.merchant}</div>
-                  <div className="text-[14px] font-bold text-bunq-green">€{Number(openPost.amount).toFixed(2)}</div>
-                </div>
-                {openPost.location_name && (
-                  <div className="text-[12px] text-bunq-mute flex items-center gap-1">
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                      <path d="M6 11s-4-3.5-4-7a4 4 0 1 1 8 0c0 3.5-4 7-4 7z" stroke="currentColor" strokeWidth="1.4" />
-                      <circle cx="6" cy="4.5" r="1.2" stroke="currentColor" strokeWidth="1.4" />
-                    </svg>
-                    {openPost.location_name}{openPost.country_code ? ` · ${openPost.country_code}` : ''}
-                  </div>
-                )}
-                {openPost.caption && (
-                  <p className="text-[14px] text-white/90 leading-snug">
-                    <span className="font-bold mr-1">You</span>{openPost.caption}
-                  </p>
-                )}
-                {openPost.snapped_at && (
-                  <div className="text-[11px] text-bunq-mute-2">
-                    {new Date(openPost.snapped_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                )}
-              </div>
+              <img src={lightbox} alt="" className="w-full rounded-2xl object-cover shadow-2xl" />
+              <button
+                onClick={() => setLightbox(null)}
+                className="mt-4 w-full py-2.5 rounded-xl bg-white/10 text-white font-semibold text-sm"
+              >
+                Close
+              </button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+    </>
+  )
+}
+
+function StatCard({ label, value, color }) {
+  return (
+    <div className="rounded-2xl bg-bunq-card border border-bunq-border p-3 text-center">
+      <div className="text-[20px] font-bold" style={{ color }}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-bunq-mute mt-0.5 font-semibold">{label}</div>
     </div>
   )
 }

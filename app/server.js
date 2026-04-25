@@ -50,15 +50,17 @@ app.post('/api/wrap', async (req, res) => {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
+      max_tokens: 600,
       messages: [{
         role: 'user',
         content: `You are the AI behind bunq $nap Weekly Wrap. Analyze these transactions and respond with ONLY valid JSON — no markdown, no asterisks, no ** formatting whatsoever.
 
 Return exactly this shape:
 {
-  "spending": "2-3 sentences about total spending, cities visited, and spending categories. Factual and direct.",
-  "mention": "1-2 sentences about the single most interesting transaction. Use dry humor — just a little wit, not forced.",
+  "spending": "3-4 sentences covering: total approximate spend, which cities were visited, main spending categories, and one observation about the pattern. Factual and specific.",
+  "top_category": "The dominant spending category as a short label with one emoji, e.g. 'Dining 🍽️' or 'Groceries 🛒'",
+  "fun_fact": "One quirky, specific observation about this week's spending — e.g. an unusual pattern, a surprising amount, or a funny streak. Keep it under 20 words. Dry wit welcome.",
+  "mention": "2-3 sentences about the single most interesting or memorable transaction. Be specific about why it stands out. Light wit, not forced.",
   "mention_merchant": "exact merchant name from the list that the mention is about"
 }
 
@@ -72,7 +74,6 @@ ${txList}`
       const raw = msg.content[0].text.replace(/```json|```/g, '').trim()
       parsed = JSON.parse(raw)
     } catch {
-      // fallback: treat whole text as spending paragraph
       parsed = { spending: msg.content[0].text.replace(/\*\*/g, ''), mention: '' }
     }
 
@@ -82,6 +83,8 @@ ${txList}`
 
     res.json({
       spending: (parsed.spending || '').replace(/\*\*/g, ''),
+      top_category: (parsed.top_category || '').replace(/\*\*/g, ''),
+      fun_fact: (parsed.fun_fact || '').replace(/\*\*/g, ''),
       mention: (parsed.mention || '').replace(/\*\*/g, ''),
       mention_photo: mentionTx?.photo_url || null,
       mention_merchant: mentionTx?.merchant || '',
@@ -95,6 +98,74 @@ ${txList}`
     })
   } catch (e) {
     console.error('/api/wrap error:', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// AI hint for GuessThePrice — looks at the actual photo URL
+app.post('/api/guess-hint', async (req, res) => {
+  try {
+    const { photo_url, merchant } = req.body
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+    const content = []
+    if (photo_url) {
+      content.push({ type: 'image', source: { type: 'url', url: photo_url } })
+    }
+    content.push({
+      type: 'text',
+      text: photo_url
+        ? `This is a purchase photo from "${merchant || 'a place'}". Give ONE witty, cryptic hint about the price in under 12 words. Be clever and funny. Do NOT say the price or any number. No quotes.`
+        : `Give ONE witty cryptic price hint for a purchase at "${merchant || 'a place'}" in under 12 words. Be funny. No numbers. No quotes.`
+    })
+
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 80,
+      messages: [{ role: 'user', content }]
+    })
+
+    res.json({ hint: msg.content[0].text.trim() })
+  } catch (e) {
+    console.error('/api/guess-hint error:', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// AI Vision — identify what's in a photo
+app.post('/api/identify', async (req, res) => {
+  try {
+    const { image_base64, media_type = 'image/jpeg' } = req.body
+    if (!image_base64) return res.status(400).json({ error: 'image_base64 required' })
+
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 120,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type, data: image_base64 }
+          },
+          {
+            type: 'text',
+            text: 'Look at this photo and identify the main item or scene. Respond with ONLY valid JSON, no markdown:\n{"item": "short item name (2-4 words max)", "emoji": "one relevant emoji", "category": "one of: Food & Drink, Coffee, Shopping, Transport, Entertainment, Travel, Groceries, Other"}'
+          }
+        ]
+      }]
+    })
+
+    let parsed
+    try {
+      parsed = JSON.parse(msg.content[0].text.replace(/```json|```/g, '').trim())
+    } catch {
+      parsed = { item: 'Something tasty', emoji: '✨', category: 'Other' }
+    }
+    res.json(parsed)
+  } catch (e) {
+    console.error('/api/identify error:', e.message)
     res.status(500).json({ error: e.message })
   }
 })

@@ -12,7 +12,7 @@ export default function BunqAhorros() {
   const target = GOALS.reduce((s, g) => s + g.target, 0)
 
   return (
-    <div className="app-content h-full pt-4 px-5 pb-4">
+    <div className="app-content h-full pt-[52px] px-5 pb-4">
       <h1 className="text-[24px] font-bold text-white tracking-tight">Savings</h1>
       <p className="text-[13px] text-bunq-mute mt-1">
         You're <span className="text-bunq-green font-semibold">{Math.round((total / target) * 100)}%</span> toward your goals

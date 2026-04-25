@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 
 export default function BunqTarjetas() {
   return (
-    <div className="app-content h-full pt-4 px-5">
+    <div className="app-content h-full pt-[52px] px-5">
       <h1 className="text-[24px] font-bold text-white tracking-tight">Cards</h1>
       <p className="text-[13px] text-bunq-mute mt-1">Manage all your bunq cards in one place</p>
 

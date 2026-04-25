@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { py } from '../../lib/api.js'
+import { py, node } from '../../lib/api.js'
 
 export default function CameraScreen({ tx, onDone, onCancel }) {
   const videoRef = useRef(null)
@@ -19,6 +19,7 @@ export default function CameraScreen({ tx, onDone, onCancel }) {
   const [showAmount, setShowAmount] = useState(false)
   const [isPublic, setIsPublic] = useState(true)
   const [uploadResult, setUploadResult] = useState(null)
+  const [aiIdentify, setAiIdentify] = useState(null)
 
   const currency = tx.currency === 'EUR' ? '€' : (tx.currency || '€')
 
@@ -124,6 +125,15 @@ export default function CameraScreen({ tx, onDone, onCancel }) {
   async function upload() {
     if (!previewBlob) return
     setStage('uploading')
+
+    // Convert blob to base64 for the identify endpoint
+    const toBase64 = blob => new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+
     try {
       // Try to get GPS, fallback to bunq HQ Amsterdam
       const pos = await new Promise(resolve => {
@@ -134,22 +144,26 @@ export default function CameraScreen({ tx, onDone, onCancel }) {
         )
       })
 
-      const data = await py.uploadPhoto({
-        transactionId: tx.id,
-        blob: previewBlob,
-        lat: pos.lat,
-        lng: pos.lng
-      })
+      const base64 = await toBase64(previewBlob)
+
+      // Run upload + identify in parallel
+      const [uploadRes, identifyRes] = await Promise.allSettled([
+        py.uploadPhoto({ transactionId: tx.id, blob: previewBlob, lat: pos.lat, lng: pos.lng }),
+        node.identify(base64, 'image/jpeg')
+      ])
+
+      const data = uploadRes.status === 'fulfilled' ? uploadRes.value
+        : { photo_url: previewUrl, caption: generateLocalCaption(tx), location: { city: 'Amsterdam' } }
+
+      if (identifyRes.status === 'fulfilled') setAiIdentify(identifyRes.value)
 
       setUploadResult(data)
       setAiCaption(data.caption)
       setEditedCaption(data.caption || '')
       setStage('success')
 
-      // Persist visibility settings (fire-and-forget)
       py.updateVisibility(tx.id, isPublic, showAmount).catch(() => {})
     } catch (e) {
-      // Demo fallback: pretend it worked
       setAiCaption(generateLocalCaption(tx))
       setEditedCaption(generateLocalCaption(tx))
       setUploadResult({ photo_url: previewUrl, caption: generateLocalCaption(tx), location: { city: 'Amsterdam' } })
@@ -258,6 +272,32 @@ export default function CameraScreen({ tx, onDone, onCancel }) {
             {stage === 'success' && (
               <AnimatePresence mode="wait">
                 <motion.div key="ok" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  {/* AI identification card */}
+                  {aiIdentify && (
+                    <motion.div
+                      initial={{ scale: 0.92, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                      className="flex items-center gap-3 px-4 py-3 rounded-2xl border"
+                      style={{ background: '#00C89612', borderColor: '#00C89640' }}
+                    >
+                      <span className="text-3xl flex-shrink-0">{aiIdentify.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] uppercase tracking-widest font-bold mb-0.5" style={{ color: '#00C896' }}>
+                          AI identified
+                        </div>
+                        <div className="text-[15px] font-bold text-white truncate">{aiIdentify.item}</div>
+                        <div className="text-[11px] text-bunq-mute">{aiIdentify.category}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-[10px] text-bunq-mute uppercase tracking-wide">price</div>
+                        <div className="text-[18px] font-bold font-mono" style={{ color: '#00C896' }}>
+                          {currency}{Number(tx.amount).toFixed(2)}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* AI caption */}
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
