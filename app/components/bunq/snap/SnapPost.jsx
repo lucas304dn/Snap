@@ -1,12 +1,56 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { DEMO_USER_ID } from '../../../lib/supabase.js'
 import GuessThePrice from './GuessThePrice.jsx'
+
+const REACTIONS = ['🔥', '💀', '😍', '🤑']
+
+// Per-emoji animation flavour
+const EMOJI_STYLE = {
+  '🔥': { count: 7, spread: 40, yMin: 50, yMax: 90, rotate: 30 },
+  '💀': { count: 5, spread: 25, yMin: 30, yMax: 60, rotate: 180 },
+  '😍': { count: 8, spread: 50, yMin: 60, yMax: 100, rotate: 20 },
+  '🤑': { count: 6, spread: 45, yMin: 40, yMax: 80, rotate: 45 },
+}
+
+function makeBurst(emoji) {
+  const style = EMOJI_STYLE[emoji] || EMOJI_STYLE['🔥']
+  return Array.from({ length: style.count }, (_, i) => ({
+    id: i,
+    x: (Math.random() - 0.5) * style.spread * 2,
+    y: -(style.yMin + Math.random() * (style.yMax - style.yMin)),
+    rotate: (Math.random() - 0.5) * style.rotate * 2,
+    scale: 0.8 + Math.random() * 0.8,
+    delay: i * 0.04,
+  }))
+}
 
 export default function SnapPost({ post }) {
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [burst, setBurst] = useState(null) // { emoji, particles, key, origin }
+  const burstRef = useRef(0)
+  const rowRef = useRef(null)
+
+  const isOwnPost = post.user_id === DEMO_USER_ID
   const username = post.profiles?.username || post.profiles?.display_name || 'friend'
-  const initial = (post.profiles?.display_name || username || '?')[0].toUpperCase()
+  const displayName = isOwnPost ? 'You' : `@${username}`
+  const initial = isOwnPost ? 'Y' : (post.profiles?.display_name || username || '?')[0].toUpperCase()
   const when = relativeTime(post.snapped_at)
+
+  function handleReaction(emoji, event) {
+    burstRef.current += 1
+    let origin = { x: 24, y: 12 }
+    if (rowRef.current && event?.currentTarget) {
+      const rowRect = rowRef.current.getBoundingClientRect()
+      const btnRect = event.currentTarget.getBoundingClientRect()
+      origin = {
+        x: btnRect.left - rowRect.left + btnRect.width / 2 - 10,
+        y: rowRect.bottom - btnRect.bottom + btnRect.height / 2 - 10,
+      }
+    }
+    setBurst({ emoji, particles: makeBurst(emoji), key: burstRef.current, origin })
+    setTimeout(() => setBurst(null), 1100)
+  }
 
   return (
     <motion.article
@@ -19,13 +63,13 @@ export default function SnapPost({ post }) {
       <header className="px-3 py-2.5 flex items-center gap-2.5">
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center text-bunq-black font-bold text-[14px]"
-          style={{ background: `hsl(${stringHash(username) % 360}, 70%, 65%)` }}
+          style={{ background: isOwnPost ? '#00DCAA' : `hsl(${stringHash(username) % 360}, 70%, 65%)` }}
         >
           {initial}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[14px] font-bold text-white truncate">@{username}</span>
+            <span className="text-[14px] font-bold text-white truncate">{displayName}</span>
             <span className="text-bunq-mute text-[12px]">·</span>
             <span className="text-[12px] text-bunq-mute">{when}</span>
           </div>
@@ -66,7 +110,7 @@ export default function SnapPost({ post }) {
       {post.caption && (
         <div className="px-4 pt-3 pb-2">
           <p className="text-[14px] leading-snug text-white">
-            <span className="font-bold mr-1.5">@{username}</span>
+            <span className="font-bold mr-1.5">{displayName}</span>
             <span className="text-white/95">{post.caption}</span>
           </p>
           <div className="flex items-center gap-1 mt-1">
@@ -77,17 +121,42 @@ export default function SnapPost({ post }) {
         </div>
       )}
 
-      {/* Reactions row */}
-      <div className="px-4 py-2.5 flex items-center gap-3 text-bunq-mute border-t border-white/5">
-        {['🔥', '💀', '😍', '🤑'].map(e => (
-          <button key={e} className="text-lg hover:scale-110 transition-transform">{e}</button>
+      {/* Reactions row with burst animation */}
+      <div ref={rowRef} className="relative px-4 py-2.5 flex items-center gap-3 border-t border-white/5 overflow-visible">
+        {REACTIONS.map(e => (
+          <motion.button
+            key={e}
+            onClick={(ev) => handleReaction(e, ev)}
+            whileTap={{ scale: 1.4 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+            className="text-lg relative z-10"
+          >
+            {e}
+          </motion.button>
         ))}
         <div className="flex-1" />
         <button className="text-bunq-mute hover:text-white text-sm">↗ Share</button>
+
+        {/* Burst particles */}
+        <AnimatePresence>
+          {burst && burst.particles.map(p => (
+            <motion.span
+              key={`${burst.key}-${p.id}`}
+              initial={{ opacity: 1, x: 0, y: 0, scale: p.scale, rotate: 0 }}
+              animate={{ opacity: 0, x: p.x, y: p.y, scale: p.scale * 1.3, rotate: p.rotate }}
+              exit={{}}
+              transition={{ duration: 0.85, ease: 'easeOut', delay: p.delay }}
+              className="absolute pointer-events-none text-xl select-none"
+              style={{ left: burst.origin.x, bottom: burst.origin.y, zIndex: 20 }}
+            >
+              {burst.emoji}
+            </motion.span>
+          ))}
+        </AnimatePresence>
       </div>
 
-      {/* Guess the price — only when amount is hidden */}
-      {!post.show_amount && post.amount != null && (
+      {/* Guess the price — only on other people's posts where amount is hidden */}
+      {!isOwnPost && !post.show_amount && (
         <GuessThePrice post={post} />
       )}
     </motion.article>

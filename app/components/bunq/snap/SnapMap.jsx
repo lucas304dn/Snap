@@ -22,7 +22,7 @@ function FlyToPin({ pin }) {
 
 export default function SnapMap({ onClose }) {
   const [pins, setPins] = useState([])
-  const [window, setWindow] = useState('all')
+  const [timeFilter, setTimeFilter] = useState('all')
   const [selected, setSelected] = useState(null)
   const [flyTarget, setFlyTarget] = useState(null)
 
@@ -45,10 +45,10 @@ export default function SnapMap({ onClose }) {
   }, [])
 
   const filteredPins = pins.filter(p => {
-    if (window === 'all') return true
-    const w = TIME_WINDOWS.find(t => t.id === window)
-    if (!w || !p.snapped_at) return true
-    return Date.now() - new Date(p.snapped_at).getTime() <= w.ms
+    if (timeFilter === 'all') return true
+    const tw = TIME_WINDOWS.find(t => t.id === timeFilter)
+    if (!tw || !p.snapped_at) return false
+    return Date.now() - new Date(p.snapped_at).getTime() <= tw.ms
   })
 
   function openPin(pin) {
@@ -69,9 +69,9 @@ export default function SnapMap({ onClose }) {
           {TIME_WINDOWS.map(t => (
             <button
               key={t.id}
-              onClick={() => setWindow(t.id)}
+              onClick={() => setTimeFilter(t.id)}
               className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                window === t.id ? 'bg-bunq-green text-bunq-black' : 'bg-bunq-card text-bunq-mute'
+                timeFilter === t.id ? 'bg-bunq-green text-bunq-black' : 'bg-bunq-card text-bunq-mute'
               }`}
             >
               {t.label}
@@ -139,11 +139,9 @@ export default function SnapMap({ onClose }) {
             className="absolute inset-x-0 bottom-0 bg-bunq-navy rounded-t-3xl border-t border-bunq-border shadow-card"
             style={{ zIndex: 500 }}
           >
-            {/* Handle */}
             <div className="w-10 h-1 bg-bunq-border rounded-full mx-auto mt-3" />
 
             <div className="px-5 pt-3 pb-6 flex items-start gap-3">
-              {/* Photo thumb */}
               {selected.photo_url ? (
                 <img
                   src={selected.photo_url}
@@ -156,7 +154,6 @@ export default function SnapMap({ onClose }) {
                 </div>
               )}
 
-              {/* Details */}
               <div className="flex-1 min-w-0">
                 <div className="text-[15px] font-bold text-white truncate">{selected.merchant}</div>
                 {selected.amount != null && (
@@ -171,6 +168,11 @@ export default function SnapMap({ onClose }) {
                       <circle cx="6" cy="4.5" r="1.2" stroke="currentColor" strokeWidth="1.4" />
                     </svg>
                     {selected.location_name || selected.country_code}
+                  </div>
+                )}
+                {selected.snapped_at && (
+                  <div className="text-[11px] text-bunq-mute-2 mt-0.5">
+                    {new Date(selected.snapped_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </div>
                 )}
                 {selected.caption && (

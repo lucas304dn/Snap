@@ -103,6 +103,22 @@ def generate_place_memory(location_name: str, visits: list[dict]) -> str:
     return msg.content[0].text.strip()
 
 
+def generate_guess_hint(merchant: str, amount: float, currency: str) -> str:
+    msg = get_client().messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=50,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Someone bought something at '{merchant}' for {currency}{amount:.2f}. "
+                "Give a cryptic one-line hint about the price range without revealing it. "
+                "Be playful. Max 10 words."
+            ),
+        }],
+    )
+    return msg.content[0].text.strip()
+
+
 def generate_friend_reaction(
     merchant: str, amount: float, currency: str, guess: float
 ) -> str:

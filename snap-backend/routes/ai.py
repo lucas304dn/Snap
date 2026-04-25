@@ -1,12 +1,14 @@
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from services.supabase_client import get_supabase
 from services.claude import (
     generate_weekly_wrap,
     generate_place_memory,
     generate_friend_reaction,
+    generate_guess_hint,
 )
 
 router = APIRouter()
@@ -31,7 +33,8 @@ async def get_friend_feed(user_id: str):
         supabase.table("transactions")
         .select(
             "id, user_id, amount, currency, merchant, photo_url, caption, "
-            "lat, lng, location_name, country_code, show_amount, snapped_at, created_at"
+            "lat, lng, location_name, country_code, show_amount, snapped_at, created_at, "
+            "profiles(username, display_name, avatar_url)"
         )
         .in_("user_id", visible_ids)
         .eq("is_public", True)
@@ -95,7 +98,7 @@ async def get_weekly_wrap(user_id: str):
         get_supabase()
         .table("transactions")
         .select(
-            "amount, currency, merchant, location_name, country_code, caption, snapped_at"
+            "amount, currency, merchant, location_name, country_code, caption, snapped_at, photo_url"
         )
         .eq("user_id", user_id)
         .gte("snapped_at", since)
@@ -212,13 +215,13 @@ async def submit_price_guess(payload: GuessPayload):
         "ai_reaction": ai_reaction,
     }).execute()
 
-    response: dict = {"ai_reaction": ai_reaction}
-    if tx.get("show_amount"):
-        response["actual_amount"] = float(tx["amount"])
-        diff = abs(float(tx["amount"]) - payload.guess_amount)
-        response["correct"] = diff < 1.0
-
-    return response
+    actual = float(tx["amount"])
+    diff = abs(actual - payload.guess_amount)
+    return {
+        "ai_reaction": ai_reaction,
+        "actual_amount": actual,
+        "correct": diff < 1.0,
+    }
 
 
 @router.get("/api/reactions/{transaction_id}")
@@ -234,3 +237,123 @@ async def get_reactions(transaction_id: str):
         or []
     )
     return {"reactions": reactions}
+
+
+@router.post("/api/simulate")
+async def simulate_payment(request: Request):
+    """Alias for /webhook/bunq/test — used by the demo control panel."""
+    body = await request.json()
+    snap_deadline = (
+        datetime.now(timezone.utc) + timedelta(minutes=5)
+    ).isoformat()
+
+    supabase = get_supabase()
+    result = supabase.table("transactions").insert({
+        "bunq_payment_id": f"sim-{datetime.now().timestamp()}",
+        "amount": float(body.get("amount", 9.99)),
+        "currency": body.get("currency", "EUR"),
+        "merchant": body.get("merchant", "Test Merchant"),
+        "snap_deadline": snap_deadline,
+        "user_id": body.get("user_id") or os.getenv("DEMO_USER_ID"),
+    }).execute()
+
+    return {
+        "status": "ok",
+        "transaction": result.data[0] if result.data else None,
+    }
+
+
+@router.get("/api/country/{user_id}/{country_code}")
+async def get_country_detail(user_id: str, country_code: str):
+    txns = (
+        get_supabase()
+        .table("transactions")
+        .select(
+            "id, merchant, amount, currency, location_name, photo_url, caption, snapped_at"
+        )
+        .eq("user_id", user_id)
+        .eq("country_code", country_code.upper())
+        .not_.is_("photo_url", "null")
+        .order("snapped_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    total = sum(float(t.get("amount") or 0) for t in txns)
+    return {
+        "country_code": country_code.upper(),
+        "snap_count": len(txns),
+        "total_spent": round(total, 2),
+        "snaps": txns,
+    }
+
+
+@router.get("/api/country-memory/{user_id}/{country_code}")
+async def get_country_memory(user_id: str, country_code: str):
+    visits = (
+        get_supabase()
+        .table("transactions")
+        .select("amount, currency, merchant, caption, snapped_at, location_name")
+        .eq("user_id", user_id)
+        .eq("country_code", country_code.upper())
+        .not_.is_("photo_url", "null")
+        .order("snapped_at")
+        .execute()
+        .data
+        or []
+    )
+    return {
+        "country_code": country_code.upper(),
+        "visit_count": len(visits),
+        "memory": generate_place_memory(country_code.upper(), visits),
+    }
+
+
+@router.get("/api/guess-hint/{transaction_id}")
+async def get_guess_hint(transaction_id: str):
+    tx = (
+        get_supabase()
+        .table("transactions")
+        .select("merchant, amount, currency")
+        .eq("id", transaction_id)
+        .single()
+        .execute()
+        .data
+    )
+    if not tx:
+        raise HTTPException(404, "Transaction not found")
+
+    hint = generate_guess_hint(
+        tx["merchant"],
+        float(tx["amount"]),
+        tx.get("currency", "EUR"),
+    )
+    return {"hint": hint}
+
+
+@router.get("/api/leaderboard")
+async def get_leaderboard():
+    reactions = (
+        get_supabase()
+        .table("reactions")
+        .select("user_id, price_guess, transaction_id, created_at, transactions(amount)")
+        .not_.is_("price_guess", "null")
+        .execute()
+        .data
+        or []
+    )
+
+    scores: dict = defaultdict(lambda: {"guesses": 0, "correct": 0})
+    for r in reactions:
+        uid = r["user_id"]
+        scores[uid]["guesses"] += 1
+        actual = (r.get("transactions") or {}).get("amount")
+        if actual is not None and abs(float(actual) - float(r["price_guess"])) < 1.0:
+            scores[uid]["correct"] += 1
+
+    result = [
+        {"user_id": uid, "guesses": v["guesses"], "correct": v["correct"]}
+        for uid, v in scores.items()
+    ]
+    result.sort(key=lambda x: (-x["correct"], -x["guesses"]))
+    return {"leaderboard": result[:20]}

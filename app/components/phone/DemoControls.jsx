@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { node } from '../../lib/api.js'
+import { py } from '../../lib/api.js'
 
 const PRESETS = [
   { merchant: 'Albert Heijn', amount: 12.45, emoji: '🛒' },
@@ -21,7 +21,7 @@ export default function DemoControls({ userId, onTriggerLocal }) {
     setBusy(true)
     setFeedback('')
     try {
-      const result = await node.simulate({ merchant: m, amount: parseFloat(a), user_id: userId })
+      const result = await py.simulate({ merchant: m, amount: parseFloat(a), user_id: userId })
       setFeedback(`✅ Sent — waiting for Realtime to deliver…`)
       // Belt-and-suspenders: also trigger locally if Realtime is slow
       setTimeout(() => {

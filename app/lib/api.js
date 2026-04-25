@@ -1,9 +1,6 @@
-// Centralised fetcher for both backends.
-// PY = Python FastAPI (photos, AI, map, feed, leaderboard, hint).
-// NODE = Node.js Express (bunq webhook + simulator endpoint).
+// All API calls go to the Python FastAPI backend (snap-backend).
 
 const PY = import.meta.env.VITE_PY_BACKEND || 'http://localhost:8000'
-const NODE = import.meta.env.VITE_NODE_BACKEND || 'http://localhost:3001'
 
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(url, opts)
@@ -16,25 +13,16 @@ async function jsonFetch(url, opts = {}) {
   return data
 }
 
-// ───────────── Node backend ─────────────
-
-export const node = {
+export const py = {
   /** Fire a fake transaction — used by the demo control panel. */
   simulate({ merchant, amount, currency = 'EUR', user_id }) {
-    return jsonFetch(`${NODE}/api/simulate`, {
+    return jsonFetch(`${PY}/api/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ merchant, amount, currency, user_id })
     })
   },
-  health() {
-    return jsonFetch(`${NODE}/health`)
-  }
-}
 
-// ───────────── Python backend ─────────────
-
-export const py = {
   /** Upload a photo blob for a transaction. */
   uploadPhoto({ transactionId, blob, lat, lng }) {
     const fd = new FormData()

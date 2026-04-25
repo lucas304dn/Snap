@@ -1,4 +1,6 @@
 import os
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -7,8 +9,18 @@ from routes.photos import router as photos_router
 from routes.ai import router as ai_router
 
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="$nap API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from services.bunq_startup import init_bunq
+    webhook_url = os.getenv("WEBHOOK_URL")
+    init_bunq(webhook_url)
+    yield
+
+
+app = FastAPI(title="$nap API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
