@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import GuessThePrice from './GuessThePrice.jsx'
 
 export default function SnapPost({ post }) {
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -84,6 +85,11 @@ export default function SnapPost({ post }) {
         <div className="flex-1" />
         <button className="text-bunq-mute hover:text-white text-sm">↗ Share</button>
       </div>
+
+      {/* Guess the price — only when amount is hidden */}
+      {!post.show_amount && post.amount != null && (
+        <GuessThePrice post={post} />
+      )}
     </motion.article>
   )
 }

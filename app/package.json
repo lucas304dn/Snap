@@ -12,6 +12,7 @@
     "register-webhook": "node bunqAuth.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@supabase/supabase-js": "^2.45.4",
     "axios": "^1.7.7",
     "cors": "^2.8.5",

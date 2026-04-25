@@ -1,7 +1,3 @@
-// When the backend is offline (e.g. judges seeing a static demo), every screen
-// falls back to this mock data so the UI is always populated and impressive.
-// The real backend takes over the moment it responds successfully.
-
 export const MOCK_FEED = [
   {
     id: 'mock-1',
@@ -36,6 +32,38 @@ export const MOCK_FEED = [
     profiles: { username: 'tim', display_name: 'Tim', avatar_url: null }
   },
   {
+    id: 'mock-5',
+    user_id: 'friend-3',
+    merchant: "Brouwerij 't IJ",
+    amount: 9.50,
+    currency: 'EUR',
+    show_amount: false,
+    location_name: 'Amsterdam',
+    country_code: 'NL',
+    lat: 52.3614,
+    lng: 4.9393,
+    photo_url: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=800&q=80',
+    caption: 'Beer brewed in a windmill. Amsterdam is built different 🍺',
+    snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    profiles: { username: 'ali', display_name: 'Ali', avatar_url: null }
+  },
+  {
+    id: 'mock-6',
+    user_id: 'friend-4',
+    merchant: 'Sugarbird Coffee',
+    amount: 4.20,
+    currency: 'EUR',
+    show_amount: false,
+    location_name: 'Amsterdam',
+    country_code: 'NL',
+    lat: 52.3738,
+    lng: 4.8910,
+    photo_url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=80',
+    caption: 'Oat milk flat white. Unironically worth it every time ☕',
+    snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 7).toISOString(),
+    profiles: { username: 'maya', display_name: 'Maya', avatar_url: null }
+  },
+  {
     id: 'mock-3',
     user_id: 'friend-3',
     merchant: 'Tokyo Ramen Bar',
@@ -50,6 +78,38 @@ export const MOCK_FEED = [
     caption: 'Late-night ramen hits different 🍜',
     snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
     profiles: { username: 'ali', display_name: 'Ali', avatar_url: null }
+  },
+  {
+    id: 'mock-7',
+    user_id: 'friend-2',
+    merchant: 'HEMA',
+    amount: 6.90,
+    currency: 'EUR',
+    show_amount: false,
+    location_name: 'Amsterdam',
+    country_code: 'NL',
+    lat: 52.3731,
+    lng: 4.8922,
+    photo_url: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&q=80',
+    caption: 'Stroopwafel + socks combo. Peak Dutch 🇳🇱',
+    snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 11).toISOString(),
+    profiles: { username: 'tim', display_name: 'Tim', avatar_url: null }
+  },
+  {
+    id: 'mock-8',
+    user_id: 'friend-4',
+    merchant: 'Cafe de Jaren',
+    amount: 7.50,
+    currency: 'EUR',
+    show_amount: false,
+    location_name: 'Amsterdam',
+    country_code: 'NL',
+    lat: 52.3689,
+    lng: 4.8975,
+    photo_url: 'https://images.unsplash.com/photo-1445116572660-236099ec97a0?w=800&q=80',
+    caption: 'Canal view, overpriced OJ, zero regrets 🌊',
+    snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 14).toISOString(),
+    profiles: { username: 'maya', display_name: 'Maya', avatar_url: null }
   },
   {
     id: 'mock-4',
@@ -87,21 +147,34 @@ export const MOCK_COUNTRY_STATS = {
   total_countries_visited: 4
 }
 
-export const MOCK_PINS = MOCK_FEED.map(t => ({
-  id: t.id,
-  merchant: t.merchant,
-  amount: t.amount,
-  currency: t.currency,
-  show_amount: t.show_amount,
-  photo_url: t.photo_url,
-  caption: t.caption,
-  lat: t.lat,
-  lng: t.lng,
-  location_name: t.location_name,
-  country_code: t.country_code,
-  snapped_at: t.snapped_at,
-  user_id: t.user_id
-}))
+// Feed entries + extra Amsterdam-only pins for the map
+const EXTRA_PINS = [
+  { id: 'pin-a', merchant: 'Uber Eats', amount: 22.80, currency: 'EUR', show_amount: false, photo_url: null, caption: null, lat: 52.3655, lng: 4.9122, location_name: 'Amsterdam', country_code: 'NL', snapped_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(), user_id: 'friend-2' },
+  { id: 'pin-b', merchant: 'Lidl', amount: 8.35, currency: 'EUR', show_amount: false, photo_url: null, caption: null, lat: 52.3790, lng: 4.9070, location_name: 'Amsterdam', country_code: 'NL', snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), user_id: 'friend-1' },
+  { id: 'pin-c', merchant: 'Dampkring', amount: 5.00, currency: 'EUR', show_amount: false, photo_url: null, caption: null, lat: 52.3720, lng: 4.8830, location_name: 'Amsterdam', country_code: 'NL', snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), user_id: 'friend-3' },
+  { id: 'pin-d', merchant: 'Foodhallen', amount: 16.50, currency: 'EUR', show_amount: false, photo_url: null, caption: null, lat: 52.3600, lng: 4.8770, location_name: 'Amsterdam', country_code: 'NL', snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(), user_id: 'friend-4' },
+  { id: 'pin-e', merchant: 'Anne Frank House', amount: 14.00, currency: 'EUR', show_amount: false, photo_url: null, caption: null, lat: 52.3752, lng: 4.8839, location_name: 'Amsterdam', country_code: 'NL', snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 9).toISOString(), user_id: 'friend-1' },
+  { id: 'pin-f', merchant: 'Rijksmuseum', amount: 22.50, currency: 'EUR', show_amount: false, photo_url: null, caption: null, lat: 52.3600, lng: 4.8852, location_name: 'Amsterdam', country_code: 'NL', snapped_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), user_id: 'friend-2' },
+]
+
+export const MOCK_PINS = [
+  ...MOCK_FEED.map(t => ({
+    id: t.id,
+    merchant: t.merchant,
+    amount: t.amount,
+    currency: t.currency,
+    show_amount: t.show_amount,
+    photo_url: t.photo_url,
+    caption: t.caption,
+    lat: t.lat,
+    lng: t.lng,
+    location_name: t.location_name,
+    country_code: t.country_code,
+    snapped_at: t.snapped_at,
+    user_id: t.user_id
+  })),
+  ...EXTRA_PINS
+]
 
 export const MOCK_TRANSACTIONS_HOME = [
   { id: 't1', merchant: 'Albert Heijn', amount: -12.45, category: '🛒', when: 'Today, 14:22' },

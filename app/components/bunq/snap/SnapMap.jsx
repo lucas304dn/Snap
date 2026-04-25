@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MapContainer, TileLayer, CircleMarker, useMap } from 'react-leaflet'
-import { py } from '../../../lib/api.js'
-import { DEMO_USER_ID } from '../../../lib/supabase.js'
+import { supabase, DEMO_USER_ID } from '../../../lib/supabase.js'
 import { MOCK_PINS } from '../../../lib/mock.js'
 
 const TIME_WINDOWS = [
@@ -27,13 +26,23 @@ export default function SnapMap({ onClose }) {
   const [selected, setSelected] = useState(null)
   const [flyTarget, setFlyTarget] = useState(null)
 
-  const userId = DEMO_USER_ID || 'demo'
-
   useEffect(() => {
-    py.mapPins(userId)
-      .then(d => setPins(d?.pins?.length ? d.pins : MOCK_PINS))
-      .catch(() => setPins(MOCK_PINS))
-  }, [userId])
+    if (!DEMO_USER_ID) { setPins(MOCK_PINS); return }
+    supabase
+      .from('transactions')
+      .select('id, merchant, amount, currency, lat, lng, photo_url, location_name, country_code, snapped_at, caption')
+      .eq('user_id', DEMO_USER_ID)
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .order('snapped_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error || !data || data.length === 0) {
+          setPins(MOCK_PINS)
+        } else {
+          setPins(data)
+        }
+      })
+  }, [])
 
   const filteredPins = pins.filter(p => {
     if (window === 'all') return true
