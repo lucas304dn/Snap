@@ -17,6 +17,9 @@
   <a href="#api-reference">API</a>
 </p>
 
+<p align="center">
+  Demo video: https://drive.google.com/file/d/1_6f50k4SrvvZhDvx576xluX9zwJh7_ji/view?usp=sharing
+</p>
 ---
 
 A social layer on top of [bunq](https://www.bunq.com). Every time you make a payment, you get a **5-minute window** to snap a photo of what you bought. That photo becomes a post in a social feed — like Instagram, but your bank account is the content.
